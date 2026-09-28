@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 
 import numpy as np
@@ -60,7 +61,7 @@ def treinar_modelo():
 
 
 def validar_features(corpo):
-    if not corpo or "features" not in corpo:
+    if not isinstance(corpo, dict) or "features" not in corpo:
         return None, "corpo deve conter 'features'"
 
     features = corpo["features"]
@@ -71,6 +72,8 @@ def validar_features(corpo):
     for v in features:
         if isinstance(v, bool) or not isinstance(v, (int, float)):
             return None, "features devem ser numericas"
+        if not math.isfinite(v):
+            return None, "features devem ser numeros finitos"
         valores.append(float(v))
 
     return valores, None

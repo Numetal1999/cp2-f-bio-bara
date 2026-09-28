@@ -50,7 +50,7 @@ def listar_eventos():
     except ValueError:
         return jsonify({"erro": "tamanho deve ser inteiro"}), 400
 
-    tamanho = min(tamanho, TAMANHO_MAXIMO)
+    tamanho = max(1, min(tamanho, TAMANHO_MAXIMO))
 
     coluna_sql = COLUNAS[ordenar_por]
     ordem_sql = ORDEM[ordem]
