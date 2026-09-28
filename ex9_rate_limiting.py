@@ -1,13 +1,21 @@
+import time
 from datetime import datetime, timedelta
 
 from flask import Flask, request, jsonify
 from sklearn.ensemble import IsolationForest
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import get_mongo_db
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
-ips_bloqueados = set()
+DURACAO_BLOQUEIO = 60
+ips_bloqueados = {}
+
+
+def esta_bloqueado(ip):
+    return ips_bloqueados.get(ip, 0) > time.time()
 
 
 @app.before_request
@@ -21,10 +29,10 @@ def registrar_inicio_requisicao():
         "timestamp": datetime.now(),
     }
 
-    if request.remote_addr in ips_bloqueados:
+    if esta_bloqueado(request.remote_addr):
         resposta = jsonify({"erro": "muitas requisicoes"})
         resposta.status_code = 429
-        resposta.headers["Retry-After"] = "60"
+        resposta.headers["Retry-After"] = str(DURACAO_BLOQUEIO)
         return resposta
 
 
@@ -76,7 +84,7 @@ def analisar_e_bloquear(janela_minutos=1):
             f"4xx {r['taxa_4xx']:.2f} | {r['rotas_distintas']} rotas]  -> {classificacao}"
         )
         if rotulo == -1:
-            ips_bloqueados.add(r["_id"])
+            ips_bloqueados[r["_id"]] = time.time() + DURACAO_BLOQUEIO
 
     return resultados
 
@@ -84,7 +92,7 @@ def analisar_e_bloquear(janela_minutos=1):
 @app.route("/api/analise-acessos", methods=["POST"])
 def rota_analise():
     analisar_e_bloquear()
-    return jsonify({"bloqueados": list(ips_bloqueados)}), 200
+    return jsonify({"bloqueados": [ip for ip in ips_bloqueados if esta_bloqueado(ip)]}), 200
 
 
 @app.route("/api/ping")
